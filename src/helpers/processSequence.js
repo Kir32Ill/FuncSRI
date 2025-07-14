@@ -44,8 +44,11 @@ const withRetries = (fn, retries = MAX_RETRIES) => async (...args) => {
   throw lastError;
 };
 
-const apiGetWithRetries = withRetries(async (url, params = {}) => {
-  const response = await api.get(url)(params);
+const apiGetWithRetries = withRetries(async (url, params) => {
+  const response = params 
+    ? await api.get(url)(params) 
+    : await api.get(url)();
+  
   if (!response || !response.result) throw new Error('Invalid API Response');
   return response;
 });
@@ -79,6 +82,10 @@ const processSequence = async ({ value, writeLog, handleSuccess, handleError }) 
     const remainder = squared % 3;
     writeLog(remainder);
 
+    if (remainder < 0 || remainder > 2) {
+      throw new Error('InvalidRemainder');
+    }
+
     const animalResponse = await apiGetWithRetries(
       `https://animals.tech/${remainder}/name`
     ).catch(error => {
@@ -86,6 +93,11 @@ const processSequence = async ({ value, writeLog, handleSuccess, handleError }) 
       throw new Error('AnimalFetchError');
     });
 
+    if (!animalResponse?.result) {
+      throw new Error('AnimalNotFound');
+    }
+
+    writeLog(`Received animal: ${animalResponse.result}`);
     handleSuccess(animalResponse.result);
 
   } catch (error) {
@@ -99,6 +111,12 @@ const processSequence = async ({ value, writeLog, handleSuccess, handleError }) 
         break;
       case 'AnimalFetchError':
         handleError('AnimalFetchError');
+        break;
+      case 'AnimalNotFound':
+        handleError('AnimalNotFound');
+        break;
+      case 'InvalidRemainder':
+        handleError('InvalidRemainder');
         break;
       default:
         handleError('NetworkError');
